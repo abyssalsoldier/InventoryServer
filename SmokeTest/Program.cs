@@ -214,6 +214,9 @@ try
     var inUsePage = await (await admin.GetAsync(a + "/in-use?q=recep")).Content.ReadAsStringAsync();
     Check("in-use page lists the unit", inUsePage.Contains("SN-101") && inUsePage.Contains("Laptop 14in") && inUsePage.Contains("Return to stock"));
     Check("search by serial finds the item", dbA.Search("sn-102").FirstOrDefault()?.Sku == "LAPTOP");
+    var listHtml = await (await admin.GetAsync(a + "/?q=laptop")).Content.ReadAsStringAsync();
+    Check("home list shows serialized item as an expandable › row with its serials",
+        listHtml.Contains("<details class=\"card expand\">") && listHtml.Contains("SN-101") && listHtml.Contains("Reception desk") && listHtml.Contains("/i/LAPTOP"));
 
     r = await admin.PostAsync(a + "/i/LAPTOP/units/return", Form(("_csrf", csrf), ("unit", unit101.Id.ToString()), ("back", "in-use")));
     Check("return from in-use page goes back to stock", r.Headers.Location!.OriginalString.StartsWith("/in-use?msg=") && dbA.Get("LAPTOP") is { Stock: 3, InUse: 0 });

@@ -157,13 +157,46 @@ public static class WebApp
                 <p class="muted">{items.Count} item(s){(q.Length > 0 ? $" matching “{H(q)}”" : "")}</p>
                 """);
             foreach (var it in items)
+            {
+                var link = $"/i/{Uri.EscapeDataString(it.Sku)}";
+                var sub = $"{H(it.Location)}{(it.Description.Length > 0 ? " · " + H(Trunc(it.Description, 80)) : "")}";
+                if (!it.Serialized)
+                {
+                    sb.Append($"""
+                        <a class="card item" href="{link}">
+                          <div><strong>{H(it.Name)}</strong> <span class="muted">{H(it.Sku)}</span><br>
+                          <span class="muted">{sub}</span></div>
+                          <div class="right">{Badge(it)}<br><span class="muted">{StockText(it)}</span></div>
+                        </a>
+                        """);
+                    continue;
+                }
+                // Serialized: a › row that expands to its serial numbers.
+                var rows = new StringBuilder();
+                foreach (var u in db.ListUnits(it.Sku))
+                    rows.Append($"""
+                        <tr><td><b>{H(u.Serial)}</b></td>
+                        <td>{(u.IsInUse ? "<span class=\"badge low\">In use</span>" : "<span class=\"badge in\">Available</span>")}</td>
+                        <td>{H(u.Location)}</td><td class="muted">{H(u.Since)}</td></tr>
+                        """);
+                var unitsHtml = rows.Length > 0
+                    ? $"<div class=\"scroll\"><table><tr><th>S/N</th><th>Status</th><th>Where</th><th>Since</th></tr>{rows}</table></div>"
+                    : "<p class=\"muted\">No serial numbers recorded yet.</p>";
                 sb.Append($"""
-                    <a class="card item" href="/i/{Uri.EscapeDataString(it.Sku)}">
-                      <div><strong>{H(it.Name)}</strong> <span class="muted">{H(it.Sku)}</span>{(it.Serialized ? " <span class=\"tag\">S/N</span>" : "")}<br>
-                      <span class="muted">{H(it.Location)}{(it.Description.Length > 0 ? " · " + H(Trunc(it.Description, 80)) : "")}</span></div>
-                      <div class="right">{Badge(it)}<br><span class="muted">{StockText(it)}</span></div>
-                    </a>
+                    <details class="card expand">
+                      <summary class="item">
+                        <div><span class="chev">›</span> <strong>{H(it.Name)}</strong><br>
+                        <span class="muted">{sub}</span></div>
+                        <div class="right">{Badge(it)}<br><span class="muted">{StockText(it)}</span></div>
+                      </summary>
+                      <div class="units">
+                        <p class="muted">SKU {H(it.Sku)} · tracked by serial number</p>
+                        {unitsHtml}
+                        <p><a href="{link}">Open item – mark in use, return, add units →</a></p>
+                      </div>
+                    </details>
                     """);
+            }
             if (items.Count == 0) sb.Append("<p>No items found.</p>");
             if (IsAdmin(ctx))
                 sb.Append($"""
@@ -540,7 +573,12 @@ public static class WebApp
               .ser-only { display:none; }
               form:has(input[name=serialized]:checked) .ser-only { display:block; }
               form:has(input[name=serialized]:checked) .qty-only { display:none; }
-              td a { color:var(--accent); }
+              td a, .units a { color:var(--accent); }
+              details.expand > summary { list-style:none; cursor:pointer; }
+              details.expand > summary::-webkit-details-marker { display:none; }
+              .chev { display:inline-block; width:1em; font-weight:700; font-size:1.2em; line-height:1; color:var(--muted); transition:transform .15s; }
+              details.expand[open] .chev { transform:rotate(90deg); }
+              .units { border-top:1px solid var(--line); margin-top:10px; padding-top:6px; }
               .row { display:flex; gap:12px; flex-wrap:wrap; } .row label { min-width:140px; }
               .search { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
               .search input[type=search] { flex:1; min-width:200px; margin:0; } .chk { display:flex; align-items:center; gap:6px; margin:0; flex:none; font-weight:400; }
