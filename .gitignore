@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+# Local data / secrets
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.pfx
+*.env
+servers.json
