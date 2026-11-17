@@ -92,7 +92,7 @@ public class MainForm : Form
 
             if (resumeServerIds != null)
             {
-                _tray.ShowBalloonTip(5000, "Inventory Server", $"Updated to version {Updater.CurrentText}.", ToolTipIcon.Info);
+                _tray.ShowBalloonTip(5000, "Inventory Server", $"Updated to {Updater.CurrentText}.", ToolTipIcon.Info);
                 await Task.Delay(TimeSpan.FromSeconds(15));
                 Updater.Cleanup();   // the installer copy has exited by now
             }
@@ -141,11 +141,11 @@ public class MainForm : Form
             return;
         }
         var notes = _available.Notes.Length > 0 ? " – " + _available.Notes.Split('\n')[0].Trim() : "";
-        _updateText.Text = $"Version {_available.Version} is available (you have {Updater.CurrentText}){notes}";
+        _updateText.Text = $"{Updater.Display(_available.Version)} is available (you have {Updater.CurrentText}){notes}";
         var wasHidden = !_updateBar.Visible;
         _updateBar.Visible = true;
         if (wasHidden && !Visible)
-            _tray.ShowBalloonTip(5000, "Inventory Server", $"Version {_available.Version} is available. Open the app to install it.", ToolTipIcon.Info);
+            _tray.ShowBalloonTip(5000, "Inventory Server", $"{Updater.Display(_available.Version)} is available. Open the app to install it.", ToolTipIcon.Info);
         if (userAsked) await InstallUpdateAsync();
     }
 
@@ -159,7 +159,7 @@ public class MainForm : Form
             return;
         }
         var running = _profiles.Where(p => _hosts.TryGetValue(p.Id, out var h) && h.Running).ToList();
-        var question = $"Install version {m.Version} now?" +
+        var question = $"Install {Updater.Display(m.Version)} now? (You have {Updater.CurrentText}.)" +
             (m.Notes.Length > 0 ? $"\n\nWhat's new:\n{m.Notes}" : "") +
             (running.Count > 0 ? $"\n\nThe running server(s) ({string.Join(", ", running.Select(p => p.DisplayName))}) stop for a few seconds and start again automatically." : "") +
             "\n\nYour inventory data is not affected.";
@@ -178,7 +178,7 @@ public class MainForm : Form
         catch (Exception e)
         {
             Error("The update could not be downloaded:\n" + e.Message);
-            _updateText.Text = $"Version {m.Version} is available (you have {Updater.CurrentText})";
+            _updateText.Text = $"{Updater.Display(m.Version)} is available (you have {Updater.CurrentText})";
             _updateInstall.Enabled = true;
             _updating = false;
         }

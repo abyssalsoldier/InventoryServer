@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -10,6 +10,8 @@
     <AssemblyName>InventoryServer</AssemblyName>
     <RootNamespace>InventoryServer</RootNamespace>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- release.ps1 overrides this with -p:Version=x.y.z; the updater compares it with the latest GitHub release. -->
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

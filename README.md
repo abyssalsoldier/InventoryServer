@@ -1,6 +1,6 @@
 # Inventory Server
 
-Double-click `publish\InventoryServer.exe` (no install, no command line).
+Double-click `InventoryServer.exe` in this folder (one self-contained file: no install, no .NET needed, no command line). The version (e.g. `V1.1.0`) is shown in the window title and at the bottom of every web page.
 
 One app can host **several companies**. Each company is a *server* with its own domain, data folder, branding, users and inventory.
 
@@ -32,11 +32,16 @@ Servers tab → **New server…** (opens automatically on first launch):
 
 ## Security / EDR notes
 * Internet-facing servers deserve IT/security sign-off. The tunnel mode keeps the app on 127.0.0.1 with no inbound port.
-* The app does not change the firewall, add startup entries or download anything. “Firewall help” shows the rule for IT.
+* The app does not change the firewall or add startup entries. “Firewall help” shows the rule for IT.
+* **Updates**: the app checks `github.com/<repo>/releases` for a newer version (at start and every 6 hours) and shows *Install now*; nothing installs without a click. Updates must carry a signature from the release key (ECDSA P-256, public key built into the app) or they are refused. Installing replaces only the program files (backup in `%LocalAppData%\InventoryServer\update\previous-version`, log in `update.log`); company data is never touched.
+
+## Shipping an update
+1. One time: `dotnet run --project ReleaseTool -- init <github-owner>/<repo>` – creates the signing key in `%AppData%\InventoryServer-release\signing-key.pem` (**back it up, keep it private**) and writes the repo + public key into `InventoryServer\Updater.cs`. Rebuild and install that build by hand once.
+2. Each release: `.\release.ps1 V1.2.0 "What changed"` – versions are `Vmajor.minor.patch` and must go up (patch = fixes, minor = new features, major = big/breaking changes). It sets the version, runs the smoke test, builds, signs, and creates the GitHub release tagged `V1.2.0` (needs `gh auth login`; the repo's releases must be public). Every running copy then offers the update.
 * Tunnel tokens and certificate passwords are saved encrypted for the current Windows user (DPAPI).
 * Sign the exe with a code-signing certificate so IT can allow-list it by publisher.
 
 ## Files
 * Settings: `%LocalAppData%\InventoryServer\servers.json`; each server's data (database, logo, backups) in its own folder. Existing single-server installs are migrated automatically (database stays in place; the old shared password is replaced by user accounts – you are asked to create an admin on first start).
-* Rebuild: `dotnet publish InventoryServer -c Release -r win-x64 --self-contained -o publish` (needs the .NET 8 SDK).
+* Rebuild: `.\build.ps1` – writes the single-file `InventoryServer.exe` into this folder (needs the .NET 8 SDK; exit the app first). The version comes from `<Version>` in `InventoryServer\InventoryServer.csproj`.
 * Tests: `dotnet run --project SmokeTest` (end-to-end checks, uses a temp folder); `dotnet run --project SmokeTest -- --gui <folder>` saves screenshots of the wizard pages.

@@ -10,6 +10,18 @@ using Microsoft.Data.Sqlite;
 
 if (args.Length == 2 && args[0] == "--gui") { GuiShots.Run(args[1]); return 0; }
 
+// Checks the live GitHub release: downloads update.json and verifies its signature against the key built into the app.
+if (args.Length == 1 && args[0] == "--check-update")
+{
+    try
+    {
+        var m = await Updater.CheckAsync();
+        Console.WriteLine($"Signature OK. This build is {Updater.CurrentText}; " + (m == null ? "no newer release." : $"newer release {Updater.Display(m.Version)} available."));
+        return 0;
+    }
+    catch (Exception e) { Console.WriteLine("Update check FAILED: " + e.Message); return 1; }
+}
+
 var root = Path.Combine(Path.GetTempPath(), "inv-smoke-" + Guid.NewGuid().ToString("N")[..6]);
 Environment.SetEnvironmentVariable("INVENTORY_DATA_DIR", root);   // must happen before ProfileStore is first used
 Directory.CreateDirectory(root);

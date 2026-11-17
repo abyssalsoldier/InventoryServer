@@ -558,7 +558,8 @@ public static class WebApp
               @media print { header, .noprint { display:none; } body { background:#fff; } main { max-width:none; padding:0; } }
             </style></head><body>
             <header><a class="brand" href="/">{{brand}}</a>{{nav}}</header>
-            <main>{{body}}</main></body></html>
+            <main>{{body}}</main>
+            <footer class="noprint muted" style="text-align:center;padding:8px 0 16px">Inventory Server {{Updater.CurrentText}}</footer></body></html>
             """;
     }
 }

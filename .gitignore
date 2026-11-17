@@ -2,6 +2,10 @@
 bin/
 obj/
 publish/
+release/
+/InventoryServer.exe
+/InventoryServer.old*.exe
+*.pem
 *.user
 *.suo
 .vs/

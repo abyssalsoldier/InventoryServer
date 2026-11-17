@@ -22,10 +22,10 @@ public record UpdateManifest(string Version, string File, string Sha256, string 
 public static class Updater
 {
     /// <summary>GitHub "owner/repo" whose releases contain updates. Set by `ReleaseTool init`.</summary>
-    public const string Repo = "OWNER/REPO";
+    public const string Repo = "abyssalsoldier/InventoryServer";
 
     /// <summary>Base64 SubjectPublicKeyInfo of the release signing key. Set by `ReleaseTool init`.</summary>
-    public const string PublicKey = "";
+    public const string PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEx9VROPj2Ij8QJMhNDj/lXGGI3e8bBs2xHyhXBZ/3pD7FQOyOqurWsgc6kk2Bba2U5K03JzT6XgKq7XmFFzBAA==";
 
     public const string ZipName = "InventoryServer-win-x64.zip";
     public const string ManifestName = "update.json";
@@ -34,7 +34,14 @@ public static class Updater
 
     public static Version Current { get; } = Normalize(Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0));
 
-    public static string CurrentText => $"{Current.Major}.{Current.Minor}.{Current.Build}";
+    /// <summary>Version as shown to people and used for release tags: "V1.2.3".</summary>
+    public static string CurrentText => Display($"{Current.Major}.{Current.Minor}.{Current.Build}");
+
+    /// <summary>"1.2.3" or "V1.2.3" → "V1.2.3".</summary>
+    public static string Display(string version) => "V" + Plain(version);
+
+    /// <summary>"V1.2.3" → "1.2.3" (the form stored in update.json and compared).</summary>
+    public static string Plain(string version) => version.Trim().TrimStart('V', 'v');
 
     static string WorkDir => Path.Combine(ProfileStore.Root, "update");
 
@@ -59,7 +66,7 @@ public static class Updater
         var json = await http.GetStringAsync($"https://github.com/{Repo}/releases/latest/download/{ManifestName}", ct);
         var m = JsonSerializer.Deserialize<UpdateManifest>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("The update information could not be read.");
-        if (!Version.TryParse(m.Version, out var v)) throw new InvalidDataException("The update has an invalid version number.");
+        if (!Version.TryParse(Plain(m.Version), out var v)) throw new InvalidDataException("The update has an invalid version number.");
         if (m.File != ZipName || !System.Text.RegularExpressions.Regex.IsMatch(m.Sha256, "^[0-9a-fA-F]{64}$"))
             throw new InvalidDataException("The update information is malformed.");
         VerifySignature(m);
@@ -96,9 +103,9 @@ public static class Updater
         Cleanup();
         Directory.CreateDirectory(WorkDir);
         var zip = Path.Combine(WorkDir, $"{m.Version}.zip");
-        progress?.Report($"Downloading version {m.Version}…");
+        progress?.Report($"Downloading {Display(m.Version)}…");
         using (var http = NewClient(TimeSpan.FromMinutes(10)))
-        await using (var src = await http.GetStreamAsync($"https://github.com/{Repo}/releases/download/v{m.Version}/{m.File}", ct))
+        await using (var src = await http.GetStreamAsync($"https://github.com/{Repo}/releases/download/{Display(m.Version)}/{m.File}", ct))
         await using (var dst = File.Create(zip))
             await src.CopyToAsync(dst, ct);
 
@@ -170,18 +177,20 @@ public static class Updater
             catch (ArgumentException) { /* already gone */ }
         }
 
+        // Only the files the update contains are backed up and replaced; anything else in the app folder is left alone.
+        var files = Directory.GetFiles(source, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(source, f)).ToList();
         var backup = Path.Combine(WorkDir, "previous-version");
         try
         {
             if (Directory.Exists(backup)) Directory.Delete(backup, true);
-            CopyTree(appDir, backup, retry: true);
-            CopyTree(source, appDir, retry: true);
+            CopyFiles(appDir, backup, files.Where(f => File.Exists(Path.Combine(appDir, f))));
+            CopyFiles(source, appDir, files);
             Log("Installed.");
         }
         catch (Exception e)
         {
             Log("FAILED: " + e.Message + " – restoring the previous version.");
-            try { CopyTree(backup, appDir, retry: true); Log("Previous version restored."); }
+            try { CopyFiles(backup, appDir, Directory.GetFiles(backup, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(backup, f))); Log("Previous version restored."); }
             catch (Exception e2) { Log("Restore FAILED: " + e2.Message + $" – copy the files from {backup} back manually."); }
             MessageBox.Show($"The update could not be installed:\n{e.Message}\n\nThe previous version was restored. Details: {Path.Combine(WorkDir, "update.log")}",
                 "Inventory Server update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -193,18 +202,17 @@ public static class Updater
         Process.Start(psi);
     }
 
-    static void CopyTree(string from, string to, bool retry)
+    /// <summary>Copies the given relative paths from one folder to another, retrying files that are briefly locked.</summary>
+    static void CopyFiles(string from, string to, IEnumerable<string> relativePaths)
     {
-        foreach (var dir in Directory.GetDirectories(from, "*", SearchOption.AllDirectories))
-            Directory.CreateDirectory(Path.Combine(to, Path.GetRelativePath(from, dir)));
-        Directory.CreateDirectory(to);
-        foreach (var file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
+        foreach (var rel in relativePaths)
         {
-            var target = Path.Combine(to, Path.GetRelativePath(from, file));
+            var target = Path.Combine(to, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             for (var attempt = 1; ; attempt++)
             {
-                try { File.Copy(file, target, overwrite: true); break; }
-                catch (IOException) when (retry && attempt < 20) { Thread.Sleep(500); }   // a file may still be locked briefly
+                try { File.Copy(Path.Combine(from, rel), target, overwrite: true); break; }
+                catch (IOException) when (attempt < 20) { Thread.Sleep(500); }
             }
         }
     }
